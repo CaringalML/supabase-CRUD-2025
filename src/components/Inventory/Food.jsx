@@ -8,6 +8,7 @@ const Food = () => {
   const [error, setError] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingFood, setEditingFood] = useState(null)
+  const [connectionStatus, setConnectionStatus] = useState('connecting')
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -59,13 +60,13 @@ const Food = () => {
         notes: foodData.notes?.trim() || null
       }
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('foods')
         .insert([sanitizedData])
         .select()
 
       if (error) throw error
-      setFoods([...foods, ...data])
+      // Don't update state here - real-time subscription will handle it
       return true
     } catch (err) {
       setError(err.message)
@@ -97,14 +98,14 @@ const Food = () => {
         notes: foodData.notes?.trim() || null
       }
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('foods')
         .update(sanitizedData)
         .eq('id', id)
         .select()
 
       if (error) throw error
-      setFoods(foods.map(food => food.id === id ? data[0] : food))
+      // Don't update state here - real-time subscription will handle it
       return true
     } catch (err) {
       setError(err.message)
@@ -126,7 +127,7 @@ const Food = () => {
         .eq('id', id)
 
       if (error) throw error
-      setFoods(foods.filter(food => food.id !== id))
+      // Don't update state here - real-time subscription will handle it
       return true
     } catch (err) {
       setError(err.message)
@@ -226,8 +227,60 @@ const Food = () => {
     return expiry < today
   }
 
+  // Real-time subscription setup
   useEffect(() => {
+    // Initial fetch
     fetchFoods()
+
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel('foods_channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'foods'
+        },
+        (payload) => {
+          console.log('Real-time event:', payload)
+          
+          switch (payload.eventType) {
+            case 'INSERT':
+              // Add new item to the beginning of the list
+              setFoods(currentFoods => [payload.new, ...currentFoods])
+              break
+              
+            case 'UPDATE':
+              // Update existing item
+              setFoods(currentFoods => 
+                currentFoods.map(food => 
+                  food.id === payload.new.id ? payload.new : food
+                )
+              )
+              break
+              
+            case 'DELETE':
+              // Remove deleted item
+              setFoods(currentFoods => 
+                currentFoods.filter(food => food.id !== payload.old.id)
+              )
+              break
+              
+            default:
+              console.log('Unknown event type:', payload.eventType)
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Subscription status:', status)
+        setConnectionStatus(status)
+      })
+
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   if (loading) return <div className="loading">Loading...</div>
@@ -235,7 +288,15 @@ const Food = () => {
   return (
     <div className="food-inventory">
       <div className="food-header">
-        <h1>Food Inventory</h1>
+        <div>
+          <h1>Food Inventory</h1>
+          <div className={`connection-status ${connectionStatus}`}>
+            <span className="status-dot"></span>
+            {connectionStatus === 'SUBSCRIBED' ? 'Real-time connected' : 
+             connectionStatus === 'CLOSED' ? 'Disconnected' : 
+             'Connecting...'}
+          </div>
+        </div>
         <button className="btn btn-primary" onClick={() => openModal()}>
           Add New Item
         </button>

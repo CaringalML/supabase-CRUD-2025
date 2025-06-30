@@ -15,11 +15,66 @@
   border-bottom: 2px solid #e0e0e0;
 }
 
-.food-header h1 {
-  margin: 0;
+.food-header > div h1 {
+  margin: 0 0 5px 0;
   color: #333;
   font-size: 2.5rem;
   font-weight: 700;
+}
+
+/* Connection Status Indicator */
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: 5px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.connection-status.SUBSCRIBED {
+  color: #38a169;
+}
+
+.connection-status.SUBSCRIBED .status-dot {
+  background-color: #38a169;
+  animation: pulse 2s infinite;
+}
+
+.connection-status.CLOSED {
+  color: #e53e3e;
+}
+
+.connection-status.CLOSED .status-dot {
+  background-color: #e53e3e;
+}
+
+.connection-status:not(.SUBSCRIBED):not(.CLOSED) {
+  color: #ed8936;
+}
+
+.connection-status:not(.SUBSCRIBED):not(.CLOSED) .status-dot {
+  background-color: #ed8936;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 /* Loading State */
